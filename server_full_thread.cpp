@@ -23,8 +23,8 @@
 
 
 
-char STR_ENVOI_RPOS[250];
-char STR_ENVOI_RREF[250];
+char STR_ENVOI_RPOS[100];
+char STR_ENVOI_RREF[100];
 
 std::mutex m_values_lock;
 HANDLE hSimConnect = NULL;
@@ -55,7 +55,7 @@ using websocketpp::lib::condition_variable;
 
 
 websocketpp::frame::opcode::value opcode_client = websocketpp::frame::opcode::value::TEXT;
-bool check_co = false;
+bool check_co = false,check_empty = false;
 
 enum action_type {
     SUBSCRIBE,
@@ -107,7 +107,6 @@ class broadcast_server {
 
     void on_open(connection_hdl hdl) {
         {
-            check_co = true;
             lock_guard<mutex> guard(m_action_lock);
            // std::cout << "on_open" << std::endl;
             m_actions.push(action(SUBSCRIBE,hdl));
@@ -128,7 +127,7 @@ class broadcast_server {
         // queue message up for sending by processing thread
         {
             lock_guard<mutex> guard(m_action_lock);
-            //std::cout << "on_message" << std::endl;
+            //std::cout << "on_message" << std::end l;
             m_actions.push(action(MESSAGE,hdl,msg));
         }
         m_action_cond.notify_one();
@@ -153,10 +152,13 @@ class broadcast_server {
                 std::cout <<"\nconnexion a un client\n";
                 lock_guard<mutex> guard(m_connection_lock);
                 m_connections.insert(a.hdl);
+                guard.~lock_guard();
+                check_co = true;
             } else if (a.type == UNSUBSCRIBE) {
                 std::cout << "\ndeconnexion d'un client\n";
                 lock_guard<mutex> guard(m_connection_lock);
                 m_connections.erase(a.hdl);
+                guard.~lock_guard();
             } else if (a.type == MESSAGE) {
                 std::cout << "\n" << a.msg->get_payload() <<std::endl; // affichage du message
                 parser(a.msg->get_payload());
@@ -177,13 +179,19 @@ class broadcast_server {
 
             con_list::iterator it;
             if (m_connections.empty()) {
+                if (!check_empty){
+                    std::cout << "list of clients empty\n";
+                    check_empty = true;
+                }
             }
             else {
+                check_empty = false;
                 for (it = m_connections.begin(); it != m_connections.end(); ++it) {
                     send_a_message(&m_server,*it,"50");
                 }
             }
-            Sleep(50);
+            guard.~lock_guard();
+            Sleep(500);
         }
         return;
     }
@@ -204,17 +212,17 @@ class broadcast_server {
             while (true) {
                 m_values_lock.lock();
 
-                RPOS_VAL.heading = q*8;
-                RPOS_VAL.elevationASL = 960+q;
-                RPOS_VAL.elevationAGL = 900+q;
-                RPOS_VAL.roll = q-20;
+                RPOS_VAL.heading = q*8+0.01;
+                RPOS_VAL.elevationASL = 2700+q+0.01;
+                RPOS_VAL.elevationAGL = 2480+q+0.01;
+                RPOS_VAL.roll = q-20+0.01;
 
-                RREF_VAL.speed = 100+(q-20);
-                RREF_VAL.rpm = 1500 +(q-20);
+                RREF_VAL.speed = 95+(q-20)/2+0.01;
+                RREF_VAL.rpm = 2300 +(q-20)*10+0.01;
 
                 m_values_lock.unlock();
                 q=(q+1)%41;
-                Sleep(50);
+                Sleep(100);
             };
             return;
             
@@ -242,38 +250,40 @@ void send_RPOS(server* s, websocketpp::connection_hdl hdl) {
     for (i=0; i<4; i++){
         float2Bytes(cache_RPOS[i],floats_RPOS[i]);
     }
-    sprintf(STR_ENVOI_RPOS,"%d %4s%4s%4s%4s",(char)0,cache_RPOS[0],cache_RPOS[1],cache_RPOS[2],cache_RPOS[3]);
+    sprintf(STR_ENVOI_RPOS,"%d;%.1f;%.1f;%.1f;%.1f\0",0,RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
 
     s->send(hdl, STR_ENVOI_RPOS, opcode_client);
 }
 
 void send_RREF(server* s, websocketpp::connection_hdl hdl) {
     char cache_RREF[2][5];
+    cache_RREF[0][4]='\0';
+    cache_RREF[1][4]='\0';
     m_values_lock.lock();
-    float floats_RREF[2] = {RREF_VAL.speed,RREF_VAL.rpm};
+    sprintf(STR_ENVOI_RREF,"%d;%.1f;%.1f\0",1,RREF_VAL.speed,RREF_VAL.rpm);
     m_values_lock.unlock();
     int i;
-    for (i=0; i<4; i++){
-        float2Bytes(cache_RREF[i],floats_RREF[i]);
+    for (i=0; i<2; i++){
+      //  float2Bytes(cache_RREF[i],floats_RREF[i]);
     }
-    sprintf(STR_ENVOI_RREF,"%d %4s%4s",(char)1,cache_RREF[0],cache_RREF[1]);
-
     s->send(hdl, STR_ENVOI_RREF, opcode_client);
+
 }
 
 bool one_err=false;
 void send_a_message(server* s, websocketpp::connection_hdl hdl, std::string payload) {
     try {
-        one_err=false;
         send_RPOS(s,hdl);
         send_RREF(s,hdl);
-
-     //   std::cout << "\rvaleurs envoyees : " << STR_ENVOI;
-    } catch (websocketpp::exception const & e) {
+        one_err=false;
+        std::cout << "\rvaleurs envoyees : " << STR_ENVOI_RREF << " --- " << STR_ENVOI_RPOS;// << "\n";
+    }
+    catch (websocketpp::exception const & e) {
         m_values_lock.unlock();
         if (!one_err) {
             one_err=true;
-            //std::cout << "Echo failed because: "<< "(" << e.what() << ")\n";
+            std::cout << "send failed\n";
+//            std::cout << "Echo failed because: "<< "(" << e.what() << ")\n";
         }
 
     }
