@@ -56,8 +56,9 @@ void CALLBACK MyDispatchProc1(SIMCONNECT_RECV* pData, DWORD cbData, void* pConte
             m_values_lock.lock();
             RPOS_VAL.heading = provi->heading;
             RPOS_VAL.elevationASL = provi->elevationASL;
-            RPOS_VAL.elevationASL = provi->elevationAGL;
-            RPOS_VAL.elevationASL = provi->roll;
+            RPOS_VAL.elevationAGL = provi->elevationAGL;
+            RPOS_VAL.roll = provi->roll;
+		//	printf("\rval simco RPOS : %f %lf %lf %f",RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
             m_values_lock.unlock();
         }
         case REQUEST_RREF:{
@@ -98,7 +99,7 @@ int initSimEvents() {
             // DATA
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RPOS, "HEADING INDICATOR", "degrees", SIMCONNECT_DATATYPE_FLOAT32);
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RPOS, "Indicated Altitude", "feet", SIMCONNECT_DATATYPE_FLOAT32);
-            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RPOS, "Plane Alt Above Ground", "feet", SIMCONNECT_DATATYPE_FLOAT32);
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RPOS, "Radio Height", "feet", SIMCONNECT_DATATYPE_FLOAT32);
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RPOS, "ATTITUDE INDICATOR BANK DEGREES", "degrees", SIMCONNECT_DATATYPE_FLOAT32);
 
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RREF, "Airspeed Indicated", "knots", SIMCONNECT_DATATYPE_FLOAT32);

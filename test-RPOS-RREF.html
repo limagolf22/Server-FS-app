@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<title>WebSocket Test</title>
+<h1>Test simconnect client</h1>
+<script language="javascript" type="text/javascript">
+
+var wsUri = "ws://localhost:9002";
+var output;
+
+function init()
+{
+  output = document.getElementById("output");
+  testWebSocket();
+}
+
+function testWebSocket()
+{
+  websocket = new WebSocket(wsUri);
+  console.log("websocket created");
+  websocket.onopen = function(evt) { onOpen(evt) };
+  websocket.onclose = function(evt) { onClose(evt) };
+  websocket.onmessage = function(evt) { onMessage(evt) };
+  websocket.onerror = function(evt) { onError(evt) };
+}
+
+function onOpen(evt)
+{
+  writeToScreen("CONNECTED");
+  writeToScreen('<span id="id_RPOS" style="color: blue;">RPOS : </span>');
+  writeToScreen('<span id="id_RREF" style="color: blue;">RREF : </span>');
+
+  //doSend("WebSocket rocks");
+}
+
+function onClose(evt)
+{
+  writeToScreen("DISCONNECTED");
+}
+
+function onMessage(evt)
+{
+  mess = evt.data.split(";");
+  switch (mess[0]){
+	case '0':
+		var el = document.getElementById("id_RPOS");
+		el.innerHTML = "RPOS : " + evt.data;
+		break;
+	case '1':
+		var el = document.getElementById("id_RREF");
+		el.innerHTML = "RREF : " + evt.data;
+		break;
+    default:
+		console.log("default")
+   }
+}
+
+function onError(evt)
+{
+ 
+  writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
+}
+
+function doSend(message)
+{
+  writeToScreen("SENT: " + message);
+  websocket.send(message);
+}
+
+function writeToScreen(message)
+{
+  var pre = document.createElement("p");
+  pre.style.wordWrap = "break-word";
+  pre.innerHTML = message;
+  output.appendChild(pre);
+}
+
+window.addEventListener("load", init, false);
+
+</script>
+
+<div id="output"></div>

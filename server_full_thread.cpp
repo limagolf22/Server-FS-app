@@ -244,13 +244,13 @@ class broadcast_server {
 void send_RPOS(server* s, websocketpp::connection_hdl hdl) {
     char cache_RPOS[4][5];
     m_values_lock.lock();
-    float floats_RPOS[4] = {RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll};
+    float floats_RPOS[4] = {RPOS_VAL.heading,(float)RPOS_VAL.elevationASL,(float)RPOS_VAL.elevationAGL,RPOS_VAL.roll};
     m_values_lock.unlock();
     int i;
     for (i=0; i<4; i++){
         float2Bytes(cache_RPOS[i],floats_RPOS[i]);
     }
-    sprintf(STR_ENVOI_RPOS,"%d;%.1f;%.1f;%.1f;%.1f\0",0,RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
+    sprintf(STR_ENVOI_RPOS,"%d;%.1f;%.1f;%.1f;%.1f\0",0,RPOS_VAL.heading,(float)RPOS_VAL.elevationASL,(float)RPOS_VAL.elevationAGL,RPOS_VAL.roll);
 
     s->send(hdl, STR_ENVOI_RPOS, opcode_client);
 }
