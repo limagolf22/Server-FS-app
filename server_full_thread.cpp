@@ -191,7 +191,7 @@ class broadcast_server {
                 }
             }
             guard.~lock_guard();
-            Sleep(500);
+            Sleep(25);
         }
         return;
     }
@@ -222,7 +222,7 @@ class broadcast_server {
 
                 m_values_lock.unlock();
                 q=(q+1)%41;
-                Sleep(100);
+                Sleep(25);
             };
             return;
             

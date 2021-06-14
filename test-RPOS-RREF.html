@@ -3,6 +3,7 @@
 <meta charset="utf-8" />
 <title>WebSocket Test</title>
 <h1>Test simconnect client</h1>
+<button onclick="trigger_pos()">trigger pos</button>
 <script language="javascript" type="text/javascript">
 
 var wsUri = "ws://localhost:9002";
@@ -73,6 +74,11 @@ function writeToScreen(message)
   pre.style.wordWrap = "break-word";
   pre.innerHTML = message;
   output.appendChild(pre);
+}
+function trigger_pos()
+{
+  websocket.send("3;48.136410;11.577540;4000.0;95.0");
+ // websocket.send("3;40.0;4.0;4000.0;95.0");
 }
 
 window.addEventListener("load", init, false);

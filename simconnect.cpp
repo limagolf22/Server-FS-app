@@ -58,7 +58,7 @@ void CALLBACK MyDispatchProc1(SIMCONNECT_RECV* pData, DWORD cbData, void* pConte
             RPOS_VAL.elevationASL = provi->elevationASL;
             RPOS_VAL.elevationAGL = provi->elevationAGL;
             RPOS_VAL.roll = provi->roll;
-		//	printf("\rval simco RPOS : %f %lf %lf %f",RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
+		//	printf("\rval simco RPOS : %f %f %f %f",RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
             m_values_lock.unlock();
         }
         case REQUEST_RREF:{
@@ -105,7 +105,19 @@ int initSimEvents() {
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RREF, "Airspeed Indicated", "knots", SIMCONNECT_DATATYPE_FLOAT32);
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_RREF, "General Eng RPM:1", "Rpm", SIMCONNECT_DATATYPE_FLOAT32);
 
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Kohlsman setting hg", "inHg");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "plane Altitude", "feet");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Plane Latitude", "degrees");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Plane Longitude", "degrees");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "PLANE Bank Degrees", "degrees");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Plane Pitch Degrees", "degrees");            
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Plane Heading Degrees magnetic", "degrees");
+            hr = SimConnect_AddToDataDefinition(hSimConnect, DEF_POS, "Airspeed Indicated", "knots");
+       
 
+
+
+         
             hr = SimConnect_AddToDataDefinition(hSimConnect, DEFINITION_BREAKDOWNS, "ENG ON FIRE", "Bool", SIMCONNECT_DATATYPE_INT32);
 
             hr = SimConnect_RequestDataOnSimObject(hSimConnect, REQUEST_RPOS, DEF_RPOS, SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_VISUAL_FRAME);
@@ -119,11 +131,15 @@ int initSimEvents() {
         }
 }
 
+//Pos Init={29.92,5000.0,48.136410, 11.577540,0.0,0.0,0.0,95.0};
+Pos pos;
+
+
 int parser(std::string strings) {
     char *buffer = &strings[0];
     COMMAND command;
     char values[250];
-    sscanf(buffer,"%d %s", &command, values);
+    sscanf(buffer,"%d;%s", &command, values);
     printf("datum:%d,value:%s\n",command,values);
     switch (command) {
         case ADD_REQ:{
@@ -132,6 +148,7 @@ int parser(std::string strings) {
             string toSR(req);
             add_Req(toSR);
             printf("req %s added\n", req);
+            break;
         }
 
         case ADD_VAL_DEF:{
@@ -140,7 +157,7 @@ int parser(std::string strings) {
             string toS(defi);
             add_data(toS, name, unit, dtt);
             printf("%s def has received the value %s\n",defi,name);
-
+            break;
         }
         case DEF_REQ:{
             char reqname[50]; char defi2[50]; int simper;
@@ -148,11 +165,14 @@ int parser(std::string strings) {
             string toSreq(reqname);
             string toSdef(defi2);
             validate_req(toSreq, toSdef, (SIMCONNECT_PERIOD)simper);
-            
-
+            break;
         }
+        case TP_REQ:{
+            printf("TP_REQ done\n");
+            sscanf(values,"%lf;%lf;%lf;%lf",&(pos.latitude), &(pos.longitude), &(pos.altitude), &(pos.speed));
+            SimConnect_SetDataOnSimObject(hSimConnect, DEF_POS, SIMCONNECT_OBJECT_ID_USER, 0, 0, sizeof(pos),&pos);
 
-       
+        }      
         return 0;
     }
     return 1;
