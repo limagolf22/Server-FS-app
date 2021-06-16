@@ -79,6 +79,7 @@ void float2Bytes(char bytes_temp[5],float float_variable);
 class broadcast_server {
     public:
     broadcast_server() {
+        refresh_time =100;
         // Initialize Asio Transport
         m_server.init_asio();
 
@@ -170,10 +171,7 @@ class broadcast_server {
     }
 
     void send_messages() {
-        while(!check_co) {
-            Sleep(10);
-        }
-        while (check_co) {
+        while (true) {
 
             lock_guard<mutex> guard(m_connection_lock);
 
@@ -191,7 +189,7 @@ class broadcast_server {
                 }
             }
             guard.~lock_guard();
-            Sleep(25);
+            Sleep(refresh_time);
         }
         return;
     }
@@ -201,6 +199,11 @@ class broadcast_server {
             while (quit == 0) {
                     // Continuously call SimConnect_CallDispatch until quit - MyDispatchProc1 will handle simulation events
                     SimConnect_CallDispatch(hSimConnect, MyDispatchProc1, NULL);
+                    m_values_lock.lock();
+                    sprintf(STR_ENVOI_RPOS,"%d;%.1f;%.1f;%.1f;%.1f\0",0,RPOS_VAL.heading,RPOS_VAL.elevationASL,RPOS_VAL.elevationAGL,RPOS_VAL.roll);
+                    sprintf(STR_ENVOI_RREF,"%d;%.1f;%.1f\0",1,RREF_VAL.speed,RREF_VAL.rpm);
+                    std::cout << "\rvalues :" << STR_ENVOI_RPOS << " --- " << STR_ENVOI_RREF;
+                    m_values_lock.unlock();   
                     Sleep(25);
                 }                
             hr = SimConnect_Close(hSimConnect);
@@ -228,6 +231,10 @@ class broadcast_server {
             
         }
     }
+    void set_refresh_time(int refr_t) {
+        refresh_time= refr_t;
+        return;
+    }
 
     private:
     typedef std::set<connection_hdl,std::owner_less<connection_hdl> > con_list;
@@ -239,35 +246,16 @@ class broadcast_server {
     mutex m_action_lock;
     mutex m_connection_lock;
     condition_variable m_action_cond;
+
+    int refresh_time;
 };
 
 void send_RPOS(server* s, websocketpp::connection_hdl hdl) {
-    char cache_RPOS[4][5];
-    m_values_lock.lock();
-    float floats_RPOS[4] = {RPOS_VAL.heading,(float)RPOS_VAL.elevationASL,(float)RPOS_VAL.elevationAGL,RPOS_VAL.roll};
-    m_values_lock.unlock();
-    int i;
-    for (i=0; i<4; i++){
-        float2Bytes(cache_RPOS[i],floats_RPOS[i]);
-    }
-    sprintf(STR_ENVOI_RPOS,"%d;%.1f;%.1f;%.1f;%.1f\0",0,RPOS_VAL.heading,(float)RPOS_VAL.elevationASL,(float)RPOS_VAL.elevationAGL,RPOS_VAL.roll);
-
     s->send(hdl, STR_ENVOI_RPOS, opcode_client);
 }
 
 void send_RREF(server* s, websocketpp::connection_hdl hdl) {
-    char cache_RREF[2][5];
-    cache_RREF[0][4]='\0';
-    cache_RREF[1][4]='\0';
-    m_values_lock.lock();
-    sprintf(STR_ENVOI_RREF,"%d;%.1f;%.1f\0",1,RREF_VAL.speed,RREF_VAL.rpm);
-    m_values_lock.unlock();
-    int i;
-    for (i=0; i<2; i++){
-      //  float2Bytes(cache_RREF[i],floats_RREF[i]);
-    }
     s->send(hdl, STR_ENVOI_RREF, opcode_client);
-
 }
 
 bool one_err=false;
@@ -276,7 +264,6 @@ void send_a_message(server* s, websocketpp::connection_hdl hdl, std::string payl
         send_RPOS(s,hdl);
         send_RREF(s,hdl);
         one_err=false;
-        std::cout << "\rvaleurs envoyees : " << STR_ENVOI_RREF << " --- " << STR_ENVOI_RPOS;// << "\n";
     }
     catch (websocketpp::exception const & e) {
         m_values_lock.unlock();
@@ -296,21 +283,23 @@ void float2Bytes(char bytes_temp[5],float float_variable){
 
 int main(int argc, char *argv[]) {
     printf("initilisation du serveur\n");
-    int nport;
+    int nport,refresh_t;
     if (argc > 1) {
-        nport=std::stoi(argv[1]);
+        nport = std::stoi(argv[1]);
+        refresh_t = std::stoi(argv[2]);
     }
     else {
-        nport=9002;
+        nport = 9002;
+        refresh_t = 100;
     }
 
     try {
     broadcast_server server_instance;
-
-    // Start a thread to run the processing loop  
-    thread t(bind(&broadcast_server::process_messages,&server_instance));
-    thread t2(bind(&broadcast_server::send_messages,&server_instance));
-    thread t3(bind(&broadcast_server::process_simconnect,&server_instance));
+    server_instance.set_refresh_time(refresh_t);
+    // Start a thread to run the processing loop 
+        thread t(bind(&broadcast_server::process_simconnect,&server_instance));
+    thread t2(bind(&broadcast_server::process_messages,&server_instance));
+    thread t3(bind(&broadcast_server::send_messages,&server_instance));
 
     printf("attente de connexion\n");
     // Run the asio loop with the main thread
